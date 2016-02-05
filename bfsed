@@ -1,0 +1,686 @@
+#!/bin/sed -f
+
+# brainfuck interpreter
+# EOF = 0, 8 bit cells, input after !
+# input is stored in pattern space, after !
+# output is stored in hold space, after !, printed at the end of the program
+
+
+:doread
+$bdoneread
+N;bdoread
+:doneread
+
+h
+
+# validation
+s/!.*//
+:a
+s/\[[^][]*]//
+ta
+/[][]/{ s/.*/error/;b }
+
+
+g
+
+# clean up script
+s/!.*//;s/[^].,<>+[-]//g
+
+# z is easy so why not
+s/\[[-+]]/z/g
+
+
+# "precompute" loops == append a counter to each [ or ]
+
+# we'll store the counter after the code
+s/$/!/
+
+tdoprec
+:doprec
+/^[^[]*$/bdoneprec
+
+# find a loop with no subloops, replace with ( count code ) count code ! count+1
+/\[\([^][]*\)]\(.*\)!\(.*\)/ s//(\3\1)\3\2!\3X/
+tdoprec
+
+:doneprec
+s/!.*//
+
+# now [ ] are ( )
+
+
+# merge program and input again
+x
+/!/{ s/^[^!]*!//;x;G;s/\n/!/;bmerged }
+g;s/$/!/
+:merged
+
+# current instruction is 0, last instruction is marked by !
+s/.*/?&/
+
+
+x
+
+# 2^15 empty cells
+# this isn't portable but most seds allocate as much memory as needed
+s/.*/________/;s/.*/&&&&&&&&/;s/.*/&&&&&&&&/;s/.*/&&&&&&&&/;s/.*/&&&&&&&&!/
+
+# debug
+#s/.*/________!/
+
+# current cell is 0
+s/_/_!/
+
+x
+
+
+tmain
+:main
+
+# debug
+#s/^/code:/p
+#s/code://
+#x
+#s/^/tape:/p
+#s/tape://
+#x
+/^[^?]*?\./b.
+/^[^?]*?,/b,
+/^[^?]*?+/b+
+/^[^?]*?-/b-
+/^[^?]*?>/b>
+/^[^?]*?</b<
+/^[^?]*?(/b(
+/^[^?]*?)/b)
+/^[^?]*?z/bz
+bend
+
+
+:next
+s/?\(.\)/\1?/
+bmain
+
+
+:z
+x
+s/_x*!/_!/
+x
+bnext
+
+:+
+x
+s/!/x!/
+# wrap at 8 bits
+s/x\{256\}!/!/
+x
+bnext
+
+:-
+x
+# ugly
+/^[^!]*_!/s/_!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/
+s/x!/!/
+x
+bnext
+
+
+# can't move out of bounds
+:>
+x
+s/!_\(x*\)/_\1!/
+x
+bnext
+
+:<
+x
+s/_\(x*\)!/!_\1/
+x
+bnext
+
+
+# sad label wants you to loop...
+:(
+x
+/x!/ { x;s/?\((X*\)/\1?/;bmain }
+x
+# must use this shit because of the lack of .*?
+s/?(X*/&_/;s/?(\(X*\)_\([^_]*\))\1\([^X]\)/(\1\2)\1?\3/
+bmain
+
+# happy label thanks you for looping!
+:)
+s/^\([^?]*\)(\(X*\)\([^?]*\)?)\2/\1?(\2\3)\2/
+bmain
+
+# looping turned out to be relatively straightforward
+
+
+# , is the dumbest part
+:,
+/^[^!]*!\x00/{ x;s/_x*!/_!/;x;bnext }
+/^[^!]*!$/{ x;s/_x*!/_!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_x!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxx!/;x;bnext }
+/^\([^!]*\)!	/{ s//\1!/;x;s/_x*!/_xxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!\n/{ s//\1!/;x;s/_x*!/_xxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)! /{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!"/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!#/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!\$/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!%/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!&/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!'/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!(/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!)/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!\*/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!+/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!,/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!-/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!\./{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!\//{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!0/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!1/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!2/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!3/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!4/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!5/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!6/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!7/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!8/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!9/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!:/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!;/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!</{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!=/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!>/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!?/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!@/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!A/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!B/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!C/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!D/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!E/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!F/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!G/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!H/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!I/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!J/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!K/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!L/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!M/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!N/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!O/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!P/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Q/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!R/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!S/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!T/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!U/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!V/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!W/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!X/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Y/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Z/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!\[/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!\\/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!]/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!\^/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!_/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!`/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!a/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!b/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!c/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!d/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!e/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!f/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!g/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!h/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!i/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!j/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!k/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!l/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!m/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!n/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!o/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!p/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!q/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!r/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!s/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!t/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!u/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!v/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!w/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!x/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!y/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!z/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!{/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!|/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!}/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!~/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ä/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Å/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ç/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!É/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ñ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ö/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ü/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!á/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!à/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!â/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ä/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ã/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!å/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ç/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!é/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!è/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ê/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ë/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!í/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ì/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!î/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ï/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ñ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ó/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ò/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ô/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ö/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!õ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ú/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ù/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!û/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ü/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!†/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!°/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!¢/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!£/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!§/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!•/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!¶/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ß/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!®/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!©/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!™/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!´/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!¨/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!≠/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Æ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ø/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!∞/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!±/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!≤/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!≥/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!¥/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!µ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!∂/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!∑/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!∏/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!π/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!∫/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ª/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!º/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ω/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!æ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ø/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!¿/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!¡/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!¬/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!√/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ƒ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!≈/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!∆/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!«/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!»/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!…/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)! /{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!À/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ã/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Õ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Œ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!œ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!–/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!—/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!“/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!”/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!‘/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!’/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!÷/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!◊/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ÿ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ÿ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!⁄/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!€/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!‹/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!›/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ﬁ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ﬂ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!‡/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!·/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!‚/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!„/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!‰/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Â/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ê/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Á/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ë/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!È/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Í/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Î/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ï/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ì/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ó/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ô/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ò/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ú/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Û/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!Ù/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ı/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ˆ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!˜/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!¯/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!˘/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!˙/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!˚/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!¸/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!˝/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!˛/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+/^\([^!]*\)!ˇ/{ s//\1!/;x;s/_x*!/_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx!/;x;bnext }
+bnext
+
+:.
+x
+# \x00 works in gnu and probably nowhere else
+/^[^!]*_!/s/$/\x00/
+/^[^!]*_x\{1\}!/s/$//
+/^[^!]*_x\{2\}!/s/$//
+/^[^!]*_x\{3\}!/s/$//
+/^[^!]*_x\{4\}!/s/$//
+/^[^!]*_x\{5\}!/s/$//
+/^[^!]*_x\{6\}!/s/$//
+/^[^!]*_x\{7\}!/s/$//
+/^[^!]*_x\{8\}!/s/$//
+/^[^!]*_x\{9\}!/s/$/	/
+/^[^!]*_x\{10\}!/s/$/\
+/
+/^[^!]*_x\{11\}!/s/$//
+/^[^!]*_x\{12\}!/s/$//
+/^[^!]*_x\{13\}!/s/$//
+/^[^!]*_x\{14\}!/s/$//
+/^[^!]*_x\{15\}!/s/$//
+/^[^!]*_x\{16\}!/s/$//
+/^[^!]*_x\{17\}!/s/$//
+/^[^!]*_x\{18\}!/s/$//
+/^[^!]*_x\{19\}!/s/$//
+/^[^!]*_x\{20\}!/s/$//
+/^[^!]*_x\{21\}!/s/$//
+/^[^!]*_x\{22\}!/s/$//
+/^[^!]*_x\{23\}!/s/$//
+/^[^!]*_x\{24\}!/s/$//
+/^[^!]*_x\{25\}!/s/$//
+/^[^!]*_x\{26\}!/s/$//
+/^[^!]*_x\{27\}!/s/$//
+/^[^!]*_x\{28\}!/s/$//
+/^[^!]*_x\{29\}!/s/$//
+/^[^!]*_x\{30\}!/s/$//
+/^[^!]*_x\{31\}!/s/$//
+/^[^!]*_x\{32\}!/s/$/ /
+/^[^!]*_x\{33\}!/s/$/!/
+/^[^!]*_x\{34\}!/s/$/"/
+/^[^!]*_x\{35\}!/s/$/#/
+/^[^!]*_x\{36\}!/s/$/$/
+/^[^!]*_x\{37\}!/s/$/%/
+/^[^!]*_x\{38\}!/s/$/\&/
+/^[^!]*_x\{39\}!/s/$/'/
+/^[^!]*_x\{40\}!/s/$/(/
+/^[^!]*_x\{41\}!/s/$/)/
+/^[^!]*_x\{42\}!/s/$/*/
+/^[^!]*_x\{43\}!/s/$/+/
+/^[^!]*_x\{44\}!/s/$/,/
+/^[^!]*_x\{45\}!/s/$/-/
+/^[^!]*_x\{46\}!/s/$/./
+/^[^!]*_x\{47\}!/s/$/\//
+/^[^!]*_x\{48\}!/s/$/0/
+/^[^!]*_x\{49\}!/s/$/1/
+/^[^!]*_x\{50\}!/s/$/2/
+/^[^!]*_x\{51\}!/s/$/3/
+/^[^!]*_x\{52\}!/s/$/4/
+/^[^!]*_x\{53\}!/s/$/5/
+/^[^!]*_x\{54\}!/s/$/6/
+/^[^!]*_x\{55\}!/s/$/7/
+/^[^!]*_x\{56\}!/s/$/8/
+/^[^!]*_x\{57\}!/s/$/9/
+/^[^!]*_x\{58\}!/s/$/:/
+/^[^!]*_x\{59\}!/s/$/;/
+/^[^!]*_x\{60\}!/s/$/</
+/^[^!]*_x\{61\}!/s/$/=/
+/^[^!]*_x\{62\}!/s/$/>/
+/^[^!]*_x\{63\}!/s/$/?/
+/^[^!]*_x\{64\}!/s/$/@/
+/^[^!]*_x\{65\}!/s/$/A/
+/^[^!]*_x\{66\}!/s/$/B/
+/^[^!]*_x\{67\}!/s/$/C/
+/^[^!]*_x\{68\}!/s/$/D/
+/^[^!]*_x\{69\}!/s/$/E/
+/^[^!]*_x\{70\}!/s/$/F/
+/^[^!]*_x\{71\}!/s/$/G/
+/^[^!]*_x\{72\}!/s/$/H/
+/^[^!]*_x\{73\}!/s/$/I/
+/^[^!]*_x\{74\}!/s/$/J/
+/^[^!]*_x\{75\}!/s/$/K/
+/^[^!]*_x\{76\}!/s/$/L/
+/^[^!]*_x\{77\}!/s/$/M/
+/^[^!]*_x\{78\}!/s/$/N/
+/^[^!]*_x\{79\}!/s/$/O/
+/^[^!]*_x\{80\}!/s/$/P/
+/^[^!]*_x\{81\}!/s/$/Q/
+/^[^!]*_x\{82\}!/s/$/R/
+/^[^!]*_x\{83\}!/s/$/S/
+/^[^!]*_x\{84\}!/s/$/T/
+/^[^!]*_x\{85\}!/s/$/U/
+/^[^!]*_x\{86\}!/s/$/V/
+/^[^!]*_x\{87\}!/s/$/W/
+/^[^!]*_x\{88\}!/s/$/X/
+/^[^!]*_x\{89\}!/s/$/Y/
+/^[^!]*_x\{90\}!/s/$/Z/
+/^[^!]*_x\{91\}!/s/$/[/
+/^[^!]*_x\{92\}!/s/$/\\/
+/^[^!]*_x\{93\}!/s/$/]/
+/^[^!]*_x\{94\}!/s/$/^/
+/^[^!]*_x\{95\}!/s/$/_/
+/^[^!]*_x\{96\}!/s/$/`/
+/^[^!]*_x\{97\}!/s/$/a/
+/^[^!]*_x\{98\}!/s/$/b/
+/^[^!]*_x\{99\}!/s/$/c/
+/^[^!]*_x\{100\}!/s/$/d/
+/^[^!]*_x\{101\}!/s/$/e/
+/^[^!]*_x\{102\}!/s/$/f/
+/^[^!]*_x\{103\}!/s/$/g/
+/^[^!]*_x\{104\}!/s/$/h/
+/^[^!]*_x\{105\}!/s/$/i/
+/^[^!]*_x\{106\}!/s/$/j/
+/^[^!]*_x\{107\}!/s/$/k/
+/^[^!]*_x\{108\}!/s/$/l/
+/^[^!]*_x\{109\}!/s/$/m/
+/^[^!]*_x\{110\}!/s/$/n/
+/^[^!]*_x\{111\}!/s/$/o/
+/^[^!]*_x\{112\}!/s/$/p/
+/^[^!]*_x\{113\}!/s/$/q/
+/^[^!]*_x\{114\}!/s/$/r/
+/^[^!]*_x\{115\}!/s/$/s/
+/^[^!]*_x\{116\}!/s/$/t/
+/^[^!]*_x\{117\}!/s/$/u/
+/^[^!]*_x\{118\}!/s/$/v/
+/^[^!]*_x\{119\}!/s/$/w/
+/^[^!]*_x\{120\}!/s/$/x/
+/^[^!]*_x\{121\}!/s/$/y/
+/^[^!]*_x\{122\}!/s/$/z/
+/^[^!]*_x\{123\}!/s/$/{/
+/^[^!]*_x\{124\}!/s/$/|/
+/^[^!]*_x\{125\}!/s/$/}/
+/^[^!]*_x\{126\}!/s/$/~/
+/^[^!]*_x\{127\}!/s/$//
+/^[^!]*_x\{128\}!/s/$/Ä/
+/^[^!]*_x\{129\}!/s/$/Å/
+/^[^!]*_x\{130\}!/s/$/Ç/
+/^[^!]*_x\{131\}!/s/$/É/
+/^[^!]*_x\{132\}!/s/$/Ñ/
+/^[^!]*_x\{133\}!/s/$/Ö/
+/^[^!]*_x\{134\}!/s/$/Ü/
+/^[^!]*_x\{135\}!/s/$/á/
+/^[^!]*_x\{136\}!/s/$/à/
+/^[^!]*_x\{137\}!/s/$/â/
+/^[^!]*_x\{138\}!/s/$/ä/
+/^[^!]*_x\{139\}!/s/$/ã/
+/^[^!]*_x\{140\}!/s/$/å/
+/^[^!]*_x\{141\}!/s/$/ç/
+/^[^!]*_x\{142\}!/s/$/é/
+/^[^!]*_x\{143\}!/s/$/è/
+/^[^!]*_x\{144\}!/s/$/ê/
+/^[^!]*_x\{145\}!/s/$/ë/
+/^[^!]*_x\{146\}!/s/$/í/
+/^[^!]*_x\{147\}!/s/$/ì/
+/^[^!]*_x\{148\}!/s/$/î/
+/^[^!]*_x\{149\}!/s/$/ï/
+/^[^!]*_x\{150\}!/s/$/ñ/
+/^[^!]*_x\{151\}!/s/$/ó/
+/^[^!]*_x\{152\}!/s/$/ò/
+/^[^!]*_x\{153\}!/s/$/ô/
+/^[^!]*_x\{154\}!/s/$/ö/
+/^[^!]*_x\{155\}!/s/$/õ/
+/^[^!]*_x\{156\}!/s/$/ú/
+/^[^!]*_x\{157\}!/s/$/ù/
+/^[^!]*_x\{158\}!/s/$/û/
+/^[^!]*_x\{159\}!/s/$/ü/
+/^[^!]*_x\{160\}!/s/$/†/
+/^[^!]*_x\{161\}!/s/$/°/
+/^[^!]*_x\{162\}!/s/$/¢/
+/^[^!]*_x\{163\}!/s/$/£/
+/^[^!]*_x\{164\}!/s/$/§/
+/^[^!]*_x\{165\}!/s/$/•/
+/^[^!]*_x\{166\}!/s/$/¶/
+/^[^!]*_x\{167\}!/s/$/ß/
+/^[^!]*_x\{168\}!/s/$/®/
+/^[^!]*_x\{169\}!/s/$/©/
+/^[^!]*_x\{170\}!/s/$/™/
+/^[^!]*_x\{171\}!/s/$/´/
+/^[^!]*_x\{172\}!/s/$/¨/
+/^[^!]*_x\{173\}!/s/$/≠/
+/^[^!]*_x\{174\}!/s/$/Æ/
+/^[^!]*_x\{175\}!/s/$/Ø/
+/^[^!]*_x\{176\}!/s/$/∞/
+/^[^!]*_x\{177\}!/s/$/±/
+/^[^!]*_x\{178\}!/s/$/≤/
+/^[^!]*_x\{179\}!/s/$/≥/
+/^[^!]*_x\{180\}!/s/$/¥/
+/^[^!]*_x\{181\}!/s/$/µ/
+/^[^!]*_x\{182\}!/s/$/∂/
+/^[^!]*_x\{183\}!/s/$/∑/
+/^[^!]*_x\{184\}!/s/$/∏/
+/^[^!]*_x\{185\}!/s/$/π/
+/^[^!]*_x\{186\}!/s/$/∫/
+/^[^!]*_x\{187\}!/s/$/ª/
+/^[^!]*_x\{188\}!/s/$/º/
+/^[^!]*_x\{189\}!/s/$/Ω/
+/^[^!]*_x\{190\}!/s/$/æ/
+/^[^!]*_x\{191\}!/s/$/ø/
+/^[^!]*_x\{192\}!/s/$/¿/
+/^[^!]*_x\{193\}!/s/$/¡/
+/^[^!]*_x\{194\}!/s/$/¬/
+/^[^!]*_x\{195\}!/s/$/√/
+/^[^!]*_x\{196\}!/s/$/ƒ/
+/^[^!]*_x\{197\}!/s/$/≈/
+/^[^!]*_x\{198\}!/s/$/∆/
+/^[^!]*_x\{199\}!/s/$/«/
+/^[^!]*_x\{200\}!/s/$/»/
+/^[^!]*_x\{201\}!/s/$/…/
+/^[^!]*_x\{202\}!/s/$/ /
+/^[^!]*_x\{203\}!/s/$/À/
+/^[^!]*_x\{204\}!/s/$/Ã/
+/^[^!]*_x\{205\}!/s/$/Õ/
+/^[^!]*_x\{206\}!/s/$/Œ/
+/^[^!]*_x\{207\}!/s/$/œ/
+/^[^!]*_x\{208\}!/s/$/–/
+/^[^!]*_x\{209\}!/s/$/—/
+/^[^!]*_x\{210\}!/s/$/“/
+/^[^!]*_x\{211\}!/s/$/”/
+/^[^!]*_x\{212\}!/s/$/‘/
+/^[^!]*_x\{213\}!/s/$/’/
+/^[^!]*_x\{214\}!/s/$/÷/
+/^[^!]*_x\{215\}!/s/$/◊/
+/^[^!]*_x\{216\}!/s/$/ÿ/
+/^[^!]*_x\{217\}!/s/$/Ÿ/
+/^[^!]*_x\{218\}!/s/$/⁄/
+/^[^!]*_x\{219\}!/s/$/€/
+/^[^!]*_x\{220\}!/s/$/‹/
+/^[^!]*_x\{221\}!/s/$/›/
+/^[^!]*_x\{222\}!/s/$/ﬁ/
+/^[^!]*_x\{223\}!/s/$/ﬂ/
+/^[^!]*_x\{224\}!/s/$/‡/
+/^[^!]*_x\{225\}!/s/$/·/
+/^[^!]*_x\{226\}!/s/$/‚/
+/^[^!]*_x\{227\}!/s/$/„/
+/^[^!]*_x\{228\}!/s/$/‰/
+/^[^!]*_x\{229\}!/s/$/Â/
+/^[^!]*_x\{230\}!/s/$/Ê/
+/^[^!]*_x\{231\}!/s/$/Á/
+/^[^!]*_x\{232\}!/s/$/Ë/
+/^[^!]*_x\{233\}!/s/$/È/
+/^[^!]*_x\{234\}!/s/$/Í/
+/^[^!]*_x\{235\}!/s/$/Î/
+/^[^!]*_x\{236\}!/s/$/Ï/
+/^[^!]*_x\{237\}!/s/$/Ì/
+/^[^!]*_x\{238\}!/s/$/Ó/
+/^[^!]*_x\{239\}!/s/$/Ô/
+/^[^!]*_x\{240\}!/s/$//
+/^[^!]*_x\{241\}!/s/$/Ò/
+/^[^!]*_x\{242\}!/s/$/Ú/
+/^[^!]*_x\{243\}!/s/$/Û/
+/^[^!]*_x\{244\}!/s/$/Ù/
+/^[^!]*_x\{245\}!/s/$/ı/
+/^[^!]*_x\{246\}!/s/$/ˆ/
+/^[^!]*_x\{247\}!/s/$/˜/
+/^[^!]*_x\{248\}!/s/$/¯/
+/^[^!]*_x\{249\}!/s/$/˘/
+/^[^!]*_x\{250\}!/s/$/˙/
+/^[^!]*_x\{251\}!/s/$/˚/
+/^[^!]*_x\{252\}!/s/$/¸/
+/^[^!]*_x\{253\}!/s/$/˝/
+/^[^!]*_x\{254\}!/s/$/˛/
+/^[^!]*_x\{255\}!/s/$/ˇ/
+x
+bnext
+
+
+:end
+x
+s/[^!]*![^!]*!//
+# that's all folks!
