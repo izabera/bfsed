@@ -91,12 +91,12 @@ tmain
 :main
 
 # debug
-s/^/code:/p
-s/code://
-x
-s/^/tape:/p
-s/tape://
-x
+#s/^/code:/p
+#s/code://
+#x
+#s/^/tape:/p
+#s/tape://
+#x
 /^[^?]*?\./b.
 /^[^?]*?,/b,
 /^[^?]*?+9/b+9; /^[^?]*?-9/b-9; /^[^?]*?>9/b>9; /^[^?]*?<9/b<9
